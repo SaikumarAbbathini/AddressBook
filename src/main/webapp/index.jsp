@@ -2,9 +2,8 @@
 <%@ page import="com.example.addressbook.*" %>
 <%
  AddressBook book = new AddressBook();
- book.add(new Contact("Asha Rao", "+91-90000-00001", "asha@example.com"));
+ book.add(new Contact("BhanJJii Rao", "+91-90000-00001", "asha@example.com"));
  book.add(new Contact("AsaikumarRao", "+91-90000-00001", "asha@example.com"));
- book.add(new Contact("Akash Sjush", "+91-90000-00001", "asha@example.com"));
  book.add(new Contact("Vikram Shah", "+91-90000-00002",
 "vikram@example.com"));
  book.add(new Contact("Meera Iyer", "+91-90000-00003", "meera@example.com"));
