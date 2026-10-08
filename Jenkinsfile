@@ -42,8 +42,8 @@ pipeline {
                 sh 'mvn -B package -DskipTests'
                 echo '===== WAR FILE ====='
                 sh 'ls -lh target/*.war'
-		stash name: 'war-artifact', include: 'target/addressbook.war'
-            }
+         	stash name: 'war-artifact', include: 'target/addressbook.war'
+	    }
             post {
                 success {
                     archiveArtifacts artifacts: 'target/AddressBook.war', fingerprint: true
