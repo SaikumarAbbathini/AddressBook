@@ -61,7 +61,7 @@ pipeline {
                 // Copy WAR file from AgentA's workspace or archived artifacts
                 sh 'mkdir -p incoming'
                 // If running in a multi-node pipeline, ensure the artifact is available or workspace is shared
-                sh 'cp target/AddressBook.war /opt/tomcat/webapps/'
+                sh 'cp target/addressbook.war /opt/tomcat/webapps/'
                 
                 echo '===== HEALTH CHECK ====='
                 script {
