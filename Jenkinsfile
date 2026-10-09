@@ -24,7 +24,7 @@ pipeline {
         stage('Compile') {
             steps {
                 echo '===== COMPILE ====='
-                sh 'mvn -B clean compile'
+                sh 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/ mvn -B clean compile'
             }
         }
 
