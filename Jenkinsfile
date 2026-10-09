@@ -1,13 +1,14 @@
 pipeline {
     agent {
-        node {
-            label 'AgentA'
-        }
-    }
-    
+        label 'AgentB'
+    } 
+
     environment {
-        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
-        PATH = "${env.JAVA_HOME}/bin:${env.PATH}"
+        M_HOME         = '/usr/share/maven'
+        DOCKER_IMAGE   = 'saikumar990890/addressbook'
+        CONTAINER_NAME = 'addressbook'
+        HOST_PORT      = '8080'
+        CONTAINER_PORT = '8080'
     }
 
     stages {
@@ -15,6 +16,8 @@ pipeline {
             steps {
                 echo '===== CHECKOUT ====='
                 git branch: 'main', url: 'https://github.com/SaikumarAbbathini/AddressBook.git'
+                sh 'hostname'
+                sh 'git log -1 --oneline'
             }
         }
 
@@ -22,8 +25,6 @@ pipeline {
             steps {
                 echo '===== COMPILE ====='
                 sh 'mvn -B clean compile'
-                echo '===== COMPILED CLASSES ====='
-                sh 'find target/classes -name "*.class"'
             }
         }
 
@@ -31,8 +32,12 @@ pipeline {
             steps {
                 echo '===== TEST ====='
                 sh 'mvn -B test'
-                echo '===== TEST REPORTS ====='
-                sh 'find target/surefire-reports -type f -maxdepth 1 -print'
+            }
+            post {
+                always {
+                    echo 'Recording test results via JUnit plugin'
+                    junit 'target/surefire-reports/*.xml'
+                }
             }
         }
 
@@ -40,66 +45,64 @@ pipeline {
             steps {
                 echo '===== PACKAGE ====='
                 sh 'mvn -B package -DskipTests'
-                echo '===== WAR FILE ====='
-                sh 'ls -lh target/*.war'
-         	stash name: 'war-artifact', includes: 'target/addressbook.war'
-	    }
-            post {
-                success {
-                    archiveArtifacts artifacts: 'target/AddressBook.war', fingerprint: true
-                }
+                sh 'ls -lh target/addressbook.war'
             }
         }
 
-        stage('Deploy & Verify (CD)') {
-            agent {
-                node {
-                    label 'AgentB'
-                }
-            }
+        stage('Docker Build') {
             steps {
-                echo '===== DEPLOYMENT TO TOMCAT ====='
-                // Copy WAR file from AgentA's workspace or archived artifacts
-                sh 'mkdir -p incoming'
-                // If running in a multi-node pipeline, ensure the artifact is available or workspace is shared
-                sh 'cp target/addressbook.war /opt/tomcat/webapps/'
-                
-                echo '===== HEALTH CHECK ====='
-                script {
-                    def url = 'http://localhost:8081/addressbook/'
-                    def maxAttempts = 10
-                    def attempt = 1
-                    def success = false
-
-                    while (attempt <= maxAttempts && !success) {
-                        echo "Attempt ${attempt}: Checking HTTP status..."
-                        def status = sh(script: "curl -s -o /dev/null -w '%{http_code}' ${url}", returnStdout: true).trim()
-                        echo "HTTP Status Received: ${status}"
-
-                        if (status == '200') {
-                            echo 'Deployment successful!'
-                            success = true
-                        } else {
-                            attempt++
-                            sleep 3
-                        }
-                    }
-
-                    if (!success) {
-                        error('Deployment health check failed after maximum attempts!')
-                    }
+                sh '''
+                echo "===== DOCKER BUILD ====="
+                docker build \
+                -t ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                -t ${DOCKER_IMAGE}:latest \
+                .
+                '''
+            }
+        }
+ 
+        stage('Docker Login and Push') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'DockerHub',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                    echo "======Docker Login========"
+                    echo "$DOCKER_PASSWORD" | docker login \
+                    -u "$DOCKER_USERNAME" \
+                    --password-stdin
+                    
+                    echo "=======Docker Push ====="
+                    docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    docker push ${DOCKER_IMAGE}:latest
+                    docker logout
+                    '''
                 }
             }
         }
-    }
-    
-    post {
-        always {
-            cleanWs()
+				
+        stage('Deploy Container') {
+            steps {
+                sh '''
+                echo "===DeployContainer=="
+                docker rm -f ${CONTAINER_NAME} || true
+                
+                docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                
+                docker run -d \
+                --name ${CONTAINER_NAME} \
+                -p ${HOST_PORT}:${CONTAINER_PORT} \
+                ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                
+                echo "====container=="
+                docker ps
+                '''
+            }
         }
     }
 }
-
-
-
 
