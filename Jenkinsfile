@@ -1,7 +1,7 @@
 pipeline {
     agent {
         label 'AgentB'
-    } 
+    }
 
     environment {
         M_HOME         = '/usr/share/maven'
@@ -31,7 +31,8 @@ pipeline {
         stage('Test') {
             steps {
                 echo '===== TEST ====='
-                sh 'mvn -B test'
+                // Added JAVA_HOME here to fix the testCompile step
+                sh 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/ mvn -B test'
             }
             post {
                 always {
@@ -44,7 +45,8 @@ pipeline {
         stage('Package') {
             steps {
                 echo '===== PACKAGE ====='
-                sh 'mvn -B package -DskipTests'
+                // Added JAVA_HOME here to prevent failures during package compilation
+                sh 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/ mvn -B package -DskipTests'
                 sh 'ls -lh target/addressbook.war'
             }
         }
@@ -60,7 +62,7 @@ pipeline {
                 '''
             }
         }
- 
+
         stage('Docker Login and Push') {
             steps {
                 withCredentials([
@@ -75,7 +77,7 @@ pipeline {
                     echo "$DOCKER_PASSWORD" | docker login \
                     -u "$DOCKER_USERNAME" \
                     --password-stdin
-                    
+
                     echo "=======Docker Push ====="
                     docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
                     docker push ${DOCKER_IMAGE}:latest
@@ -84,20 +86,20 @@ pipeline {
                 }
             }
         }
-				
+
         stage('Deploy Container') {
             steps {
                 sh '''
                 echo "===DeployContainer=="
                 docker rm -f ${CONTAINER_NAME} || true
-                
+
                 docker pull ${DOCKER_IMAGE}:${BUILD_NUMBER}
-                
+
                 docker run -d \
                 --name ${CONTAINER_NAME} \
                 -p ${HOST_PORT}:${CONTAINER_PORT} \
                 ${DOCKER_IMAGE}:${BUILD_NUMBER}
-                
+
                 echo "====container=="
                 docker ps
                 '''
@@ -105,6 +107,4 @@ pipeline {
         }
     }
 }
-
-
 
